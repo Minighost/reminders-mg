@@ -58,7 +58,7 @@ class ReminderApp(tk.Tk):
         super().__init__()
         self.title("Reminders")
         self.resizable(False, False)
-        self.geometry("320x320")
+        self.geometry("320x420")
         self._build_ui()
         self._pending: list[dict] = []  # track active reminders
 
@@ -116,6 +116,7 @@ class ReminderApp(tk.Tk):
             textvariable=self.min_var,
             wrap=True,
         ).pack(side="left")
+        tk.Label(r, text="(miliary time)").pack(side="left", padx=3)
 
         # Title
         r = row()
@@ -150,8 +151,8 @@ class ReminderApp(tk.Tk):
 
         r = row(pady=(0, 12))
         self.list_var = tk.StringVar()
-        tk.Listbox(r, listvariable=self.list_var, height=4, font=("", 9)).pack(
-            side="left", fill="x", expand=True
+        tk.Listbox(r, listvariable=self.list_var, height=11, font=("", 9)).pack(
+            side="left", fill="both", expand=True
         )
 
     # Actions

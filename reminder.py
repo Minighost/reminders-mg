@@ -58,90 +58,101 @@ class ReminderApp(tk.Tk):
         super().__init__()
         self.title("Reminders")
         self.resizable(False, False)
+        self.geometry("320x320")
         self._build_ui()
         self._pending: list[dict] = []  # track active reminders
 
     # Layout
-
     def _build_ui(self):
-        pad = dict(padx=10, pady=6)
+        now = datetime.datetime.now()
 
-        # Date row
-        tk.Label(self, text="Date").grid(row=0, column=0, sticky="e", **pad)
+        # Helpers
+        def row(pady=(4, 0)):
+            """A full-width frame for one logical row."""
+            f = tk.Frame(self)
+            f.pack(fill="x", padx=14, pady=pady)
+            return f
+
+        def label(parent, text, top_align=False, pady=(0, 0)):
+            """Right-aligned label that lines up with the input widgets."""
+            anchor = "ne" if top_align else "e"
+            tk.Label(parent, text=text, width=8, anchor=anchor).pack(
+                side="left", pady=pady
+            )
+
+        # Date
+        r = row()
+        label(r, "Date", pady=(10, 0))
         self.date_entry = DateEntry(
-            self,
+            r,
             width=12,
-            date_pattern="mm-dd-yyyy",
+            date_pattern="yyyy-mm-dd",
             firstweekday="sunday",
             showweeknumbers=False,
         )
-        self.date_entry.grid(row=0, column=1, columnspan=3, sticky="w", **pad)
+        self.date_entry.pack(side="left", padx=(6, 0), pady=(10, 0))
 
-        # Time row
-        tk.Label(self, text="Time").grid(row=1, column=0, sticky="e", **pad)
-
-        now = datetime.datetime.now()
+        # Time
+        r = row()
+        label(r, "Time")
         self.hour_var = tk.StringVar(value=f"{now.hour:02d}")
         self.min_var = tk.StringVar(value=f"{now.minute:02d}")
-
-        hour_spin = ttk.Spinbox(
-            self,
+        ttk.Spinbox(
+            r,
             from_=0,
             to=23,
             width=4,
             format="%02.0f",
             textvariable=self.hour_var,
             wrap=True,
-        )
-        hour_spin.grid(row=1, column=1, sticky="w", padx=(10, 0), pady=6)
-
-        tk.Label(self, text=":").grid(row=1, column=2)
-
-        min_spin = ttk.Spinbox(
-            self,
+        ).pack(side="left", padx=(6, 0))
+        tk.Label(r, text=":").pack(side="left", padx=3)
+        ttk.Spinbox(
+            r,
             from_=0,
             to=59,
             width=4,
             format="%02.0f",
             textvariable=self.min_var,
             wrap=True,
-        )
-        min_spin.grid(row=1, column=3, sticky="w", padx=(0, 10), pady=6)
+        ).pack(side="left")
 
-        # Title row
-        tk.Label(self, text="Title").grid(row=2, column=0, sticky="e", **pad)
+        # Title
+        r = row()
+        label(r, "Title")
         self.title_var = tk.StringVar(value="Reminder")
-        tk.Entry(self, textvariable=self.title_var, width=28).grid(
-            row=2, column=1, columnspan=3, sticky="ew", **pad
+        tk.Entry(r, textvariable=self.title_var).pack(
+            side="left", fill="x", expand=True, padx=(6, 10)
         )
 
-        # Message row
-        tk.Label(self, text="Message").grid(
-            row=3, column=0, sticky="ne", padx=10, pady=6
-        )
-        self.msg_text = tk.Text(self, width=28, height=3, wrap="word")
-        self.msg_text.grid(row=3, column=1, columnspan=3, sticky="ew", **pad)
-
-        # Status / countdown
-        self.status_var = tk.StringVar(value="")
-        tk.Label(self, textvariable=self.status_var, fg="gray", font=("", 9)).grid(
-            row=4, column=0, columnspan=4, pady=(0, 4)
-        )
+        # Message
+        r = row()
+        label(r, "Message", top_align=True)
+        self.msg_text = tk.Text(r, height=3, wrap="word")
+        self.msg_text.pack(side="left", fill="x", expand=True, padx=(6, 10))
 
         # Button
-        ttk.Button(self, text="Set Reminder", command=self._on_set).grid(
-            row=5, column=0, columnspan=4, pady=(0, 12)
+        r = row(pady=(6, 6))
+        ttk.Button(r, text="Set Reminder", command=self._on_set).pack(
+            side="left", expand=True
         )
 
-        # Active reminders list
-        tk.Label(self, text="Active reminders", font=("", 9, "bold")).grid(
-            row=6, column=0, columnspan=4, sticky="w", padx=10
+        # Status
+        r = row(pady=(0, 0))
+        self.status_var = tk.StringVar(value="Status: Waiting...")
+        tk.Label(r, textvariable=self.status_var, fg="gray", font=("", 9)).pack(
+            side="left", padx=(0, 0), expand=True
         )
 
+        # Active reminders
+        r = row(pady=(4, 2))
+        tk.Label(r, text="Active reminders", font=("", 9, "bold")).pack(side="left")
+
+        r = row(pady=(0, 12))
         self.list_var = tk.StringVar()
-        tk.Listbox(
-            self, listvariable=self.list_var, height=4, width=40, font=("", 9)
-        ).grid(row=7, column=0, columnspan=4, padx=10, pady=(0, 10))
+        tk.Listbox(r, listvariable=self.list_var, height=4, font=("", 9)).pack(
+            side="left", fill="x", expand=True
+        )
 
     # Actions
     def _on_set(self):

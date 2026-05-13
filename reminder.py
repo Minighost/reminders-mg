@@ -71,7 +71,7 @@ class ReminderApp(tk.Tk):
         self.date_entry = DateEntry(
             self,
             width=12,
-            date_pattern="yyyy-mm-dd",
+            date_pattern="mm-dd-yyyy",
             firstweekday="sunday",
             showweeknumbers=False,
         )
@@ -173,20 +173,20 @@ class ReminderApp(tk.Tk):
         def on_start(delta_secs):
             mins = int(delta_secs // 60)
             secs = int(delta_secs % 60)
-            self.status_var.set(f"⏰  '{title}' fires in {mins}m {secs}s")
+            self.status_var.set(f"'{title}' fires in {mins}m {secs}s")
 
         def on_done():
             self._pending[idx]["done"] = True
             self._refresh_list()
-            self.status_var.set(f"✔  '{title}' fired!")
+            self.status_var.set(f"'{title}' fired!")
 
         schedule(target_dt, title, message, on_start, on_done)
 
     def _refresh_list(self):
         items = []
         for r in self._pending:
-            tick = "✔" if r["done"] else "⏳"
-            items.append(f"{tick}  {r['label']}")
+            tick = "Done" if r["done"] else "Waiting"
+            items.append(f"{tick}:  {r['label']}")
         self.list_var.set(items)
 
 

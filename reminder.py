@@ -1,55 +1,23 @@
 """
 reminder.py — Set a one-shot Windows desktop notification for a future datetime.
-
-Dependencies:
-    pip install tkcalendar plyer
-
-Usage:
-    python reminder.py
 """
 
-import threading
-import time
 import datetime
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-try:
-    from tkcalendar import DateEntry
-except ImportError:
-    raise SystemExit("Missing dependency: pip install tkcalendar")
-
-try:
-    from plyer import notification
-except ImportError:
-    raise SystemExit("Missing dependency: pip install plyer")
+from tkcalendar import DateEntry
+from plyer import notification
 
 
 # Notification
 def fire_notification(title: str, message: str) -> None:
     notification.notify(
         title=title,
-        message=message or "Time's up!",
-        app_name="Reminder",
-        timeout=15,  # seconds the toast stays visible
+        message=message or "From reminder.py",
+        app_name="Reminders",
+        timeout=15, # seconds the toast stays visible
     )
-
-
-# Background sleep thread
-def schedule(
-    target_dt: datetime.datetime, title: str, message: str, on_start, on_done
-) -> None:
-    """Sleep until target_dt in a daemon thread, then fire the notification."""
-    delta = (target_dt - datetime.datetime.now()).total_seconds()
-
-    def _run():
-        on_start(delta)
-        time.sleep(delta)
-        fire_notification(title, message)
-        on_done()
-
-    t = threading.Thread(target=_run, daemon=True)
-    t.start()
 
 
 # GUI
@@ -60,7 +28,7 @@ class ReminderApp(tk.Tk):
         self.resizable(False, False)
         self.geometry("320x420")
         self._build_ui()
-        self._pending: list[dict] = []  # track active reminders
+        self._pending: list[dict] = [] # track active reminders
 
     # Layout
     def _build_ui(self):
@@ -68,13 +36,11 @@ class ReminderApp(tk.Tk):
 
         # Helpers
         def row(pady=(4, 0)):
-            """A full-width frame for one logical row."""
             f = tk.Frame(self)
             f.pack(fill="x", padx=14, pady=pady)
             return f
 
         def label(parent, text, top_align=False, pady=(0, 0)):
-            """Right-aligned label that lines up with the input widgets."""
             anchor = "ne" if top_align else "e"
             tk.Label(parent, text=text, width=8, anchor=anchor).pack(
                 side="left", pady=pady
@@ -116,7 +82,6 @@ class ReminderApp(tk.Tk):
             textvariable=self.min_var,
             wrap=True,
         ).pack(side="left")
-        tk.Label(r, text="(miliary time)").pack(side="left", padx=3)
 
         # Title
         r = row()
@@ -139,10 +104,10 @@ class ReminderApp(tk.Tk):
         )
 
         # Status
-        r = row(pady=(0, 0))
+        r = row()
         self.status_var = tk.StringVar(value="Status: Waiting...")
-        tk.Label(r, textvariable=self.status_var, fg="gray", font=("", 9)).pack(
-            side="left", padx=(0, 0), expand=True
+        tk.Label(r, textvariable=self.status_var, fg="gray").pack(
+            side="left", expand=True
         )
 
         # Active reminders
@@ -157,8 +122,6 @@ class ReminderApp(tk.Tk):
 
     # Actions
     def _on_set(self):
-
-        # Parse datetime
         try:
             date_str = self.date_entry.get_date().strftime("%Y-%m-%d")
             hour = int(self.hour_var.get())
@@ -170,9 +133,12 @@ class ReminderApp(tk.Tk):
             messagebox.showerror("Invalid input", "Could not parse the date/time.")
             return
 
-        if target_dt <= datetime.datetime.now():
+        now = datetime.datetime.now()
+        if target_dt <= now:
             messagebox.showerror("Past time", "Please choose a future date and time.")
             return
+
+        delta_ms = int((target_dt - now).total_seconds() * 1000)
 
         title = self.title_var.get().strip() or "Reminder"
         message = self.msg_text.get("1.0", "end").strip()
@@ -182,17 +148,19 @@ class ReminderApp(tk.Tk):
         idx = len(self._pending) - 1
         self._refresh_list()
 
-        def on_start(delta_secs):
-            mins = int(delta_secs // 60)
-            secs = int(delta_secs % 60)
-            self.status_var.set(f"'{title}' fires in {mins}m {secs}s")
+        # update status immediately
+        secs = delta_ms // 1000
+        mins, secs = divmod(secs, 60)
+        self.status_var.set(f"'{title}' fires in {mins}m {secs}s")
 
-        def on_done():
+        # schedule notification
+        def trigger():
+            fire_notification(title, message)
             self._pending[idx]["done"] = True
             self._refresh_list()
             self.status_var.set(f"'{title}' fired!")
 
-        schedule(target_dt, title, message, on_start, on_done)
+        self.after(delta_ms, trigger)
 
     def _refresh_list(self):
         items = []

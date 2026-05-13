@@ -7,17 +7,15 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from tkcalendar import DateEntry
-from plyer import notification
+from winotify import Notification
 
 
 # Notification
 def fire_notification(title: str, message: str) -> None:
-    notification.notify(
-        title=title,
-        message=message or "From reminder.py",
-        app_name="Reminders",
-        timeout=15, # seconds the toast stays visible
+    toast = Notification(
+        app_id="Reminder", title=title, msg=message or "From reminder.py"
     )
+    toast.show()
 
 
 # GUI
@@ -28,7 +26,7 @@ class ReminderApp(tk.Tk):
         self.resizable(False, False)
         self.geometry("320x420")
         self._build_ui()
-        self._pending: list[dict] = [] # track active reminders
+        self._pending: list[dict] = []  # track active reminders
 
     # Layout
     def _build_ui(self):

@@ -21,6 +21,8 @@ from PyQt5.QtWidgets import (
     QDialog,
     QDialogButtonBox,
 )
+from PyQt5.QtGui import QIcon
+
 from winotify import Notification
 
 DATE_FORMAT = "MM-dd-yyyy"
@@ -349,6 +351,7 @@ class ReminderApp(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setWindowIcon(QIcon("reminder_icon.ico"))
     window = ReminderApp()
     window.show()
     sys.exit(app.exec_())

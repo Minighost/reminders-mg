@@ -27,7 +27,14 @@ from winotify import Notification
 
 DATE_FORMAT = "MM-dd-yyyy"
 DATE_FORMAT_LITERAL = "%m-%d-%Y %H:%M"
-SAVE_FILE = Path(__file__).parent / "reminders.json"
+
+if getattr(sys, 'frozen', False):
+    # Running as PyInstaller EXE
+    BASE_DIR = Path(sys.executable).parent
+else:
+    # Running as script
+    BASE_DIR = Path(__file__).parent
+SAVE_FILE = BASE_DIR / "reminders.json"
 
 
 # Notification

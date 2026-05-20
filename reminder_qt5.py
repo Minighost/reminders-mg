@@ -36,6 +36,12 @@ def fire_notification(title: str, message: str) -> None:
     toast.show()
 
 
+# Override QSpinBox for zero-padded time selection
+class PaddedSpinBox(QSpinBox):
+    def textFromValue(self, value: int) -> str:
+        return f"{value:02d}"
+
+
 # Edit dialog - reused for both new and existing reminders
 class ReminderDialog(QDialog):
     def __init__(self, parent=None, reminder: dict = None):
@@ -55,11 +61,11 @@ class ReminderDialog(QDialog):
 
         # Time
         time_layout = QHBoxLayout()
-        self.hour_spin = QSpinBox()
+        self.hour_spin = PaddedSpinBox()
         self.hour_spin.setRange(0, 23)
         self.hour_spin.setFixedWidth(55)
         self.hour_spin.setWrapping(True)
-        self.min_spin = QSpinBox()
+        self.min_spin = PaddedSpinBox()
         self.min_spin.setRange(0, 59)
         self.min_spin.setFixedWidth(55)
         self.min_spin.setWrapping(True)

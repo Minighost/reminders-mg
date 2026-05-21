@@ -196,20 +196,17 @@ class ReminderApp(QWidget):
                 except (KeyError, ValueError):
                     continue
 
-                status = "missed" if target_dt <= now else "waiting"
                 self._pending.append(
                     {
                         "title": entry.get("title", "Reminder"),
                         "message": entry.get("message", ""),
                         "target_dt": target_dt,
-                        "status": status,
+                        "status": entry.get("status", "missed"),
                         "timer": None,
                     }
                 )
 
         missed = [r for r in self._pending if r["status"] == "missed"]
-        waiting = [r for r in self._pending if r["status"] == "waiting"]
-
         for i, r in enumerate(self._pending):
             if r["status"] == "waiting":
                 self._schedule(i)
@@ -217,10 +214,9 @@ class ReminderApp(QWidget):
         self._refresh_list()
 
         if missed:
-            names = ", ".join(f"'{r['title']}'" for r in missed)
-            self.status_label.setText(f"Missed while closed: {names}")
-        elif waiting:
-            self.status_label.setText(f"{len(waiting)} reminder(s) loaded.")
+            self.status_label.setText(f"{len(missed)} reminder(s) missed while closed!")
+        else:
+            self.status_label.setText(f"{len(self._pending)} reminder(s) loaded.")
 
     def _save(self):
         to_save = [
@@ -228,9 +224,9 @@ class ReminderApp(QWidget):
                 "title": r["title"],
                 "message": r["message"],
                 "target_dt": r["target_dt"].isoformat(),
+                "status": r["status"],
             }
             for r in self._pending
-            if r["status"] != "done"  # don't persist completed reminders
         ]
         SAVE_FILE.write_text(json.dumps(to_save, indent=4), encoding="utf-8")
 

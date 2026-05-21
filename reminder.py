@@ -167,6 +167,7 @@ class ReminderApp(QWidget):
 
         main_layout.addWidget(QLabel("Reminders:"))
         self.list_widget = QListWidget()
+        self.list_widget.setSelectionMode(QListWidget.ExtendedSelection)
         main_layout.addWidget(self.list_widget)
 
         btn_layout = QHBoxLayout()
@@ -261,10 +262,6 @@ class ReminderApp(QWidget):
                 f"{status}:  {r['title']}  →  {r['target_dt'].strftime(DATE_FORMAT_LITERAL)}"
             )
 
-    def _selected_idx(self) -> int | None:
-        row = self.list_widget.currentRow()
-        return row if row >= 0 else None
-
     # Actions
     def _on_add(self):
         dlg = ReminderDialog(self)
@@ -286,13 +283,15 @@ class ReminderApp(QWidget):
         self.status_label.setText(f"'{values['title']}' fires in {mins}m {secs}s")
 
     def _on_edit(self):
-        idx = self._selected_idx()
-        if idx is None:
-            QMessageBox.information(
-                self, "No selection", "Please select a reminder to edit."
-            )
+        selected_reminders = self.list_widget.selectedItems()
+        if not selected_reminders:
+            QMessageBox.information(self, "No selection", "Please select a reminder to edit.")
+            return
+        if len(selected_reminders) > 1:
+            QMessageBox.information(self, "Too many selected", "Please select only 1 reminder to edit.")
             return
 
+        idx = self.list_widget.row(selected_reminders[0])
         reminder = self._pending[idx]
         if reminder["status"] != "waiting":
             QMessageBox.information(
@@ -326,30 +325,34 @@ class ReminderApp(QWidget):
         )
 
     def _on_delete(self):
-        idx = self._selected_idx()
-        if idx is None:
-            QMessageBox.information(
-                self, "No selection", "Please select a reminder to delete."
-            )
+        selected_reminders = self.list_widget.selectedItems()
+        if not selected_reminders:
+            QMessageBox.information(self, "No selection", "Please select a reminder to delete.")
             return
 
-        reminder = self._pending[idx]
+        # reminders must be deleted from last to first, so the indices of the list do not shift
+        indices = sorted(
+            [self.list_widget.row(item) for item in selected_reminders], reverse=True
+        )
+
         confirm = QMessageBox.question(
             self,
-            "Delete reminder",
-            f"Delete '{reminder['title']}'?",
+            "Delete reminder(s)",
+            f"Delete {len(indices)} reminder(s)?",
             QMessageBox.Yes | QMessageBox.No,
         )
         if confirm != QMessageBox.Yes:
             return
 
-        if reminder["timer"]:
-            reminder["timer"].stop()
+        for idx in indices:
+            reminder = self._pending[idx]
+            if reminder["timer"]:
+                reminder["timer"].stop()
+            self._pending.pop(idx)
 
-        self._pending.pop(idx)
         self._refresh_list()
         self._save()
-        self.status_label.setText("Reminder deleted.")
+        self.status_label.setText(f"{len(indices)} reminder(s) deleted.")
 
 
 if __name__ == "__main__":

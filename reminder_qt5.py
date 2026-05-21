@@ -21,6 +21,8 @@ from PyQt5.QtWidgets import (
 )
 from winotify import Notification
 
+DATE_FORMAT = "MM-dd-yyyy"
+DATE_FORMAT_LITERAL = "%m-%d-%Y %H:%M"
 
 # Notification
 def fire_notification(title: str, message: str) -> None:
@@ -45,7 +47,7 @@ class ReminderDialog(QDialog):
         # Date
         self.date_edit = QDateEdit()
         self.date_edit.setCalendarPopup(True)
-        self.date_edit.setDisplayFormat("yyyy-MM-dd")
+        self.date_edit.setDisplayFormat(DATE_FORMAT)
 
         # Time
         time_layout = QHBoxLayout()
@@ -96,14 +98,11 @@ class ReminderDialog(QDialog):
         layout.addWidget(buttons)
 
     def get_values(self) -> dict | None:
-        """Validate and return form values, or None on error."""
         try:
-            qdate = self.date_edit.date()
-            date_str = qdate.toString("yyyy-MM-dd")
-            hour = self.hour_spin.value()
-            minute = self.min_spin.value()
+            date_str = self.date_edit.date().toString(DATE_FORMAT)
             target_dt = datetime.datetime.strptime(
-                f"{date_str} {hour:02d}:{minute:02d}", "%Y-%m-%d %H:%M"
+                f"{date_str} {self.hour_spin.value():02d}:{self.min_spin.value():02d}",
+                DATE_FORMAT_LITERAL,
             )
         except ValueError:
             QMessageBox.critical(
@@ -191,7 +190,7 @@ class ReminderApp(QWidget):
         for r in self._pending:
             tick = "Done" if r["done"] else "Waiting"
             self.list_widget.addItem(
-                f"{tick}:  {r['title']}  →  {r['target_dt'].strftime('%Y-%m-%d %H:%M')}"
+                f"{status}:  {r['title']}  →  {r['target_dt'].strftime(DATE_FORMAT_LITERAL)}"
             )
 
     def _selected_idx(self) -> int | None:

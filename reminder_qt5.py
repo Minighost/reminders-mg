@@ -1,5 +1,7 @@
 import datetime
+import json
 import sys
+from pathlib import Path
 
 from PyQt5.QtCore import QTimer, QDate
 from PyQt5.QtWidgets import (
@@ -23,6 +25,8 @@ from winotify import Notification
 
 DATE_FORMAT = "MM-dd-yyyy"
 DATE_FORMAT_LITERAL = "%m-%d-%Y %H:%M"
+SAVE_FILE = Path(__file__).parent / "reminders.json"
+
 
 # Notification
 def fire_notification(title: str, message: str) -> None:
@@ -129,32 +133,27 @@ class ReminderApp(QWidget):
         super().__init__()
         self.setWindowTitle("Reminders")
         self.setFixedSize(360, 340)
-        self._pending: list[dict] = (
-            []
-        )  # each entry: {title, message, target_dt, done, timer}
+        self._pending: list[dict] = []
         self._build_ui()
+        self._load()
 
     def _build_ui(self):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(14, 14, 14, 14)
         main_layout.setSpacing(8)
 
-        # Add button
         self.add_btn = QPushButton("+ Add Reminder")
         self.add_btn.clicked.connect(self._on_add)
         main_layout.addWidget(self.add_btn)
 
-        # Status
         self.status_label = QLabel("Status: Waiting...")
         self.status_label.setStyleSheet("color: gray;")
         main_layout.addWidget(self.status_label)
 
-        # Active reminders list
-        main_layout.addWidget(QLabel("Active reminders:"))
+        main_layout.addWidget(QLabel("Reminders:"))
         self.list_widget = QListWidget()
         main_layout.addWidget(self.list_widget)
 
-        # Edit / Delete buttons
         btn_layout = QHBoxLayout()
         self.edit_btn = QPushButton("Edit")
         self.edit_btn.clicked.connect(self._on_edit)
@@ -164,9 +163,64 @@ class ReminderApp(QWidget):
         btn_layout.addWidget(self.delete_btn)
         main_layout.addLayout(btn_layout)
 
+    # Persistence
+    def _load(self):
+        self._pending = []
+        if SAVE_FILE.exists():
+            try:
+                raw = json.loads(SAVE_FILE.read_text(encoding="utf-8"))
+            except Exception as e:  # unsure what exceptions are possible here
+                self.status_label.setText("Exception occurred while loading reminders from json!")
+                return # if there's an exception, list'll be empty anyway
+                # maybe it's better to do `raw = []`? idk
+
+            now = datetime.datetime.now()
+            for entry in raw:
+                try:
+                    target_dt = datetime.datetime.fromisoformat(entry["target_dt"])
+                except (KeyError, ValueError):
+                    continue
+
+                status = "missed" if target_dt <= now else "waiting"
+                self._pending.append(
+                    {
+                        "title": entry.get("title", "Reminder"),
+                        "message": entry.get("message", ""),
+                        "target_dt": target_dt,
+                        "status": status,
+                        "timer": None,
+                    }
+                )
+
+        missed = [r for r in self._pending if r["status"] == "missed"]
+        waiting = [r for r in self._pending if r["status"] == "waiting"]
+
+        for i, r in enumerate(self._pending):
+            if r["status"] == "waiting":
+                self._schedule(i)
+
+        self._refresh_list()
+
+        if missed:
+            names = ", ".join(f"'{r['title']}'" for r in missed)
+            self.status_label.setText(f"Missed while closed: {names}")
+        elif waiting:
+            self.status_label.setText(f"{len(waiting)} reminder(s) loaded.")
+
+    def _save(self):
+        to_save = [
+            {
+                "title": r["title"],
+                "message": r["message"],
+                "target_dt": r["target_dt"].isoformat(),
+            }
+            for r in self._pending
+            if r["status"] != "done"  # don't persist completed reminders
+        ]
+        SAVE_FILE.write_text(json.dumps(to_save, indent=4), encoding="utf-8")
+
     # Helpers
     def _schedule(self, idx: int) -> None:
-        """Start a QTimer for the reminder at idx."""
         reminder = self._pending[idx]
         delta_ms = int(
             (reminder["target_dt"] - datetime.datetime.now()).total_seconds() * 1000
@@ -177,8 +231,9 @@ class ReminderApp(QWidget):
 
         def trigger():
             fire_notification(reminder["title"], reminder["message"])
-            self._pending[idx]["done"] = True
+            self._pending[idx]["status"] = "done"
             self._refresh_list()
+            self._save()
             self.status_label.setText(f"'{reminder['title']}' fired!")
 
         timer.timeout.connect(trigger)
@@ -188,13 +243,14 @@ class ReminderApp(QWidget):
     def _refresh_list(self):
         self.list_widget.clear()
         for r in self._pending:
-            tick = "Done" if r["done"] else "Waiting"
+            status = {"waiting": "Waiting", "done": "Done", "missed": "Missed"}[
+                r["status"]
+            ]
             self.list_widget.addItem(
                 f"{status}:  {r['title']}  →  {r['target_dt'].strftime(DATE_FORMAT_LITERAL)}"
             )
 
     def _selected_idx(self) -> int | None:
-        """Return the index of the selected list item, or None."""
         row = self.list_widget.currentRow()
         return row if row >= 0 else None
 
@@ -207,10 +263,11 @@ class ReminderApp(QWidget):
         if values is None:
             return
 
-        self._pending.append({**values, "done": False, "timer": None})
+        self._pending.append({**values, "status": "waiting", "timer": None})
         idx = len(self._pending) - 1
         self._schedule(idx)
         self._refresh_list()
+        self._save()
 
         mins, secs = divmod(
             int((values["target_dt"] - datetime.datetime.now()).total_seconds()), 60
@@ -226,9 +283,11 @@ class ReminderApp(QWidget):
             return
 
         reminder = self._pending[idx]
-        if reminder["done"]:
+        if reminder["status"] != "waiting":
             QMessageBox.information(
-                self, "Already fired", "Cannot edit a reminder that has already fired."
+                self,
+                "Cannot edit",
+                f"This reminder has status '{reminder['status']}' and cannot be edited.",
             )
             return
 
@@ -243,9 +302,10 @@ class ReminderApp(QWidget):
         if reminder["timer"]:
             reminder["timer"].stop()
 
-        self._pending[idx] = {**values, "done": False, "timer": None}
+        self._pending[idx] = {**values, "status": "waiting", "timer": None}
         self._schedule(idx)
         self._refresh_list()
+        self._save()
 
         mins, secs = divmod(
             int((values["target_dt"] - datetime.datetime.now()).total_seconds()), 60
@@ -277,6 +337,7 @@ class ReminderApp(QWidget):
 
         self._pending.pop(idx)
         self._refresh_list()
+        self._save()
         self.status_label.setText("Reminder deleted.")
 
 

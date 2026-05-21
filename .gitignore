@@ -1,4 +1,5 @@
 /build/
 /dist/
+/.venv/
 *.spec
 reminders.json

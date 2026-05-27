@@ -3,7 +3,7 @@ import json
 import sys
 from pathlib import Path
 
-from PyQt5.QtCore import QTimer, QDate
+from PyQt5.QtCore import Qt, QTimer, QDate
 from PyQt5.QtWidgets import (
     QApplication,
     QWidget,
@@ -23,8 +23,6 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QIcon
 
-from winotify import Notification
-
 DATE_FORMAT = "MM-dd-yyyy"
 DATE_FORMAT_LITERAL = "%m-%d-%Y %H:%M"
 
@@ -35,14 +33,6 @@ else:
     # Running as script
     BASE_DIR = Path(__file__).parent
 SAVE_FILE = BASE_DIR / "reminders.json"
-
-
-# Notification
-def fire_notification(title: str, message: str) -> None:
-    toast = Notification(
-        app_id="Reminder", title=title, msg=message or "From reminder.py"
-    )
-    toast.show()
 
 
 # Override QSpinBox for zero-padded time selection
@@ -142,6 +132,41 @@ class ReminderDialog(QDialog):
         }
 
 
+# Notification Pop-up - Similar to Outlook's notification style
+class NotificationWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setFixedSize(300, 100)
+        self.setWindowFlags(Qt.Tool | Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_ShowWithoutActivating)
+
+        self._title_label = QLabel()
+        self._title_label.setStyleSheet("font-weight: bold; font-size: 11pt;")
+        self._msg_label = QLabel()
+        self._msg_label.setWordWrap(True)
+
+        dismiss_btn = QPushButton("Dismiss")
+        dismiss_btn.clicked.connect(self.hide)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 8, 10, 8)
+        layout.addWidget(self._title_label)
+        layout.addWidget(self._msg_label)
+        layout.addWidget(dismiss_btn, alignment=Qt.AlignRight)
+
+        # Position once at construction
+        screen = QApplication.primaryScreen().availableGeometry()
+        self.move(
+            screen.right() - self.width() - 10,
+            screen.bottom() - self.height() - 10,
+        )
+
+    def notify(self, title: str, message: str) -> None:
+        self._title_label.setText(title)
+        self._msg_label.setText(message)
+        self.show()
+
+
 # Main window
 class ReminderApp(QWidget):
     def __init__(self):
@@ -149,6 +174,7 @@ class ReminderApp(QWidget):
         self.setWindowTitle("Reminders")
         self.setFixedSize(360, 340)
         self._pending: list[dict] = []
+        self._notif_window = NotificationWindow()
         self._build_ui()
         self._load()
 
@@ -248,7 +274,7 @@ class ReminderApp(QWidget):
         timer.setSingleShot(True)
 
         def trigger():
-            fire_notification(reminder["title"], reminder["message"])
+            self._notif_window.notify(reminder["title"], reminder["message"])
             self._pending[idx]["status"] = "done"
             self._refresh_list()
             self._save()

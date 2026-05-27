@@ -28,7 +28,7 @@ from winotify import Notification
 DATE_FORMAT = "MM-dd-yyyy"
 DATE_FORMAT_LITERAL = "%m-%d-%Y %H:%M"
 
-if getattr(sys, 'frozen', False):
+if getattr(sys, "frozen", False):
     # Running as PyInstaller EXE
     BASE_DIR = Path(sys.executable).parent
 else:
@@ -186,8 +186,10 @@ class ReminderApp(QWidget):
             try:
                 raw = json.loads(SAVE_FILE.read_text(encoding="utf-8"))
             except Exception as e:  # unsure what exceptions are possible here
-                self.status_label.setText("Exception occurred while loading reminders from json!")
-                return # if there's an exception, list'll be empty anyway
+                self.status_label.setText(
+                    "Exception occurred while loading reminders from json!"
+                )
+                return  # if there's an exception, list'll be empty anyway
                 # maybe it's better to do `raw = []`? idk
 
             now = datetime.datetime.now()
@@ -285,10 +287,14 @@ class ReminderApp(QWidget):
     def _on_edit(self):
         selected_reminders = self.list_widget.selectedItems()
         if not selected_reminders:
-            QMessageBox.information(self, "No selection", "Please select a reminder to edit.")
+            QMessageBox.information(
+                self, "No selection", "Please select a reminder to edit."
+            )
             return
         if len(selected_reminders) > 1:
-            QMessageBox.information(self, "Too many selected", "Please select only 1 reminder to edit.")
+            QMessageBox.information(
+                self, "Too many selected", "Please select only 1 reminder to edit."
+            )
             return
 
         idx = self.list_widget.row(selected_reminders[0])
@@ -327,7 +333,9 @@ class ReminderApp(QWidget):
     def _on_delete(self):
         selected_reminders = self.list_widget.selectedItems()
         if not selected_reminders:
-            QMessageBox.information(self, "No selection", "Please select a reminder to delete.")
+            QMessageBox.information(
+                self, "No selection", "Please select a reminder to delete."
+            )
             return
 
         # reminders must be deleted from last to first, so the indices of the list do not shift

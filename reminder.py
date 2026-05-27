@@ -136,35 +136,36 @@ class ReminderDialog(QDialog):
 class NotificationWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setFixedSize(300, 100)
-        self.setWindowFlags(Qt.Tool | Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
+        self.setFixedSize(300, 200)
+        self.setWindowTitle("Reminders")
+        # self.setWindowFlags(Qt.Tool)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
 
-        self._title_label = QLabel()
-        self._title_label.setStyleSheet("font-weight: bold; font-size: 11pt;")
-        self._msg_label = QLabel()
-        self._msg_label.setWordWrap(True)
-
-        dismiss_btn = QPushButton("Dismiss")
-        dismiss_btn.clicked.connect(self.hide)
+        self._list = QListWidget()
+        self._list.setWordWrap(True)
+        self._list.setSpacing(2)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 8, 10, 8)
-        layout.addWidget(self._title_label)
-        layout.addWidget(self._msg_label)
-        layout.addWidget(dismiss_btn, alignment=Qt.AlignRight)
+        layout.addWidget(self._list)
 
-        # Position once at construction
         screen = QApplication.primaryScreen().availableGeometry()
         self.move(
             screen.right() - self.width() - 10,
-            screen.bottom() - self.height() - 10,
+            screen.bottom() - self.height() - 40,
         )
 
     def notify(self, title: str, message: str) -> None:
-        self._title_label.setText(title)
-        self._msg_label.setText(message)
+        text = title if not message else f"{title}: {message}"
+        self._list.addItem(text)
         self.show()
+        QApplication.alert(self)  # make taskbar icon flash
+
+    # Override close event
+    def closeEvent(self, event):
+        self._list.clear()
+        QApplication.alert(self, 0)
+        event.accept()
 
 
 # Main window

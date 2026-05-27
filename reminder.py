@@ -199,12 +199,16 @@ class ReminderApp(QWidget):
                 except (KeyError, ValueError):
                     continue
 
+                saved_status = entry.get("status", "missed")
+                if saved_status == "waiting" and target_dt <= now:
+                    saved_status = "missed"
+
                 self._pending.append(
                     {
                         "title": entry.get("title", "Reminder"),
                         "message": entry.get("message", ""),
                         "target_dt": target_dt,
-                        "status": entry.get("status", "missed"),
+                        "status": saved_status,
                         "timer": None,
                     }
                 )

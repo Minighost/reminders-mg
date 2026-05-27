@@ -179,6 +179,16 @@ class ReminderApp(QWidget):
         self._build_ui()
         self._load()
 
+        # use a "watchdog" to trigger reminders. this prevents reminders from triggering
+        # at incorrect times after computer sleep.
+        # caveat: 30 seconds of "error" for reminders
+        self._watchdog = QTimer(self)
+        self._watchdog.setInterval(30_000)  # check every 30 seconds
+        # might need tighter timing? not sure how this impacts CPU usage
+        self._watchdog.timeout.connect(self._check_reminders)
+        self._watchdog.start()
+        self._check_reminders()  # immediately check reminders on startup
+
     def _build_ui(self):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(14, 14, 14, 14)
@@ -236,15 +246,10 @@ class ReminderApp(QWidget):
                         "message": entry.get("message", ""),
                         "target_dt": target_dt,
                         "status": saved_status,
-                        "timer": None,
                     }
                 )
 
         missed = [r for r in self._pending if r["status"] == "missed"]
-        for i, r in enumerate(self._pending):
-            if r["status"] == "waiting":
-                self._schedule(i)
-
         self._refresh_list()
 
         if missed:
@@ -265,25 +270,18 @@ class ReminderApp(QWidget):
         SAVE_FILE.write_text(json.dumps(to_save, indent=4), encoding="utf-8")
 
     # Helpers
-    def _schedule(self, idx: int) -> None:
-        reminder = self._pending[idx]
-        delta_ms = int(
-            (reminder["target_dt"] - datetime.datetime.now()).total_seconds() * 1000
-        )
-
-        timer = QTimer(self)
-        timer.setSingleShot(True)
-
-        def trigger():
-            self._notif_window.notify(reminder["title"], reminder["message"])
-            self._pending[idx]["status"] = "done"
+    def _check_reminders(self):
+        now = datetime.datetime.now()
+        fired_any = False
+        for r in self._pending:
+            if r["status"] == "waiting" and r["target_dt"] <= now:
+                r["status"] = "done"
+                self._notif_window.notify(r["title"], r["message"])
+                self.status_label.setText(f"'{r['title']}' fired!")
+                fired_any = True
+        if fired_any:
             self._refresh_list()
             self._save()
-            self.status_label.setText(f"'{reminder['title']}' fired!")
-
-        timer.timeout.connect(trigger)
-        timer.start(delta_ms)
-        self._pending[idx]["timer"] = timer
 
     def _refresh_list(self):
         self.list_widget.clear()
@@ -304,9 +302,7 @@ class ReminderApp(QWidget):
         if values is None:
             return
 
-        self._pending.append({**values, "status": "waiting", "timer": None})
-        idx = len(self._pending) - 1
-        self._schedule(idx)
+        self._pending.append({**values, "status": "waiting"})
         self._refresh_list()
         self._save()
 
@@ -345,12 +341,7 @@ class ReminderApp(QWidget):
         if values is None:
             return
 
-        # Cancel old timer and reschedule
-        if reminder["timer"]:
-            reminder["timer"].stop()
-
-        self._pending[idx] = {**values, "status": "waiting", "timer": None}
-        self._schedule(idx)
+        self._pending[idx] = {**values, "status": "waiting"}
         self._refresh_list()
         self._save()
 
@@ -384,9 +375,6 @@ class ReminderApp(QWidget):
             return
 
         for idx in indices:
-            reminder = self._pending[idx]
-            if reminder["timer"]:
-                reminder["timer"].stop()
             self._pending.pop(idx)
 
         self._refresh_list()
